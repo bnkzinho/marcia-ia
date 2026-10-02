@@ -2,11 +2,30 @@
 
 from __future__ import annotations
 
+import socket
 import subprocess
 import sys
+import threading
+import time
 
 import click
 from rich.console import Console
+
+_BACKEND_HOST = "127.0.0.1"
+_BACKEND_PORT = 8000
+_BACKEND_READY_TIMEOUT = 15.0
+
+
+def _wait_for_backend(host: str, port: int, timeout: float) -> bool:
+    """Poll until something accepts connections on host:port, or time out."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return True
+        except OSError:
+            time.sleep(0.3)
+    return False
 
 
 @click.command()
@@ -68,17 +87,25 @@ def clap(threshold: float, min_gap: float, max_gap: float, calibrate: bool) -> N
             pass
         return
 
-    def _open_gui() -> None:
-        console.print("[green]Double clap detected — opening the GUI...[/green]")
+    def _start_and_open_gui() -> None:
         # Start the plain API server first (no-op if one is already running —
         # `start` just prints a warning and exits 1 in that case). Launching
         # the GUI with `--no-server` skips `jarvis gui`'s own server bootstrap,
         # which pulls in desktop extras that aren't installable on every
         # platform (e.g. onnxruntime has no macOS x86_64 wheel).
         subprocess.run([sys.executable, "-m", "openjarvis.cli", "start"], check=False)
+        # Give the daemon a moment to actually bind before opening the browser —
+        # otherwise the frontend loads with a "cannot reach backend" error.
+        _wait_for_backend(_BACKEND_HOST, _BACKEND_PORT, _BACKEND_READY_TIMEOUT)
         subprocess.Popen(
             [sys.executable, "-m", "openjarvis.cli", "gui", "--no-server"]
         )
+
+    def _open_gui() -> None:
+        console.print("[green]Double clap detected — opening the GUI...[/green]")
+        # Run off the audio thread: starting the server can take a few
+        # seconds, and blocking here would stall the microphone stream.
+        threading.Thread(target=_start_and_open_gui, daemon=True).start()
 
     console.print(
         f"[cyan]Listening for a double clap (threshold={threshold})... "
