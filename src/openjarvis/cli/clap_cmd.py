@@ -70,7 +70,15 @@ def clap(threshold: float, min_gap: float, max_gap: float, calibrate: bool) -> N
 
     def _open_gui() -> None:
         console.print("[green]Double clap detected — opening the GUI...[/green]")
-        subprocess.Popen([sys.executable, "-m", "openjarvis.cli", "gui"])
+        # Start the plain API server first (no-op if one is already running —
+        # `start` just prints a warning and exits 1 in that case). Launching
+        # the GUI with `--no-server` skips `jarvis gui`'s own server bootstrap,
+        # which pulls in desktop extras that aren't installable on every
+        # platform (e.g. onnxruntime has no macOS x86_64 wheel).
+        subprocess.run([sys.executable, "-m", "openjarvis.cli", "start"], check=False)
+        subprocess.Popen(
+            [sys.executable, "-m", "openjarvis.cli", "gui", "--no-server"]
+        )
 
     console.print(
         f"[cyan]Listening for a double clap (threshold={threshold})... "
