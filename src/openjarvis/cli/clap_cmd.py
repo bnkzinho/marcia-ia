@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+import webbrowser
 
 import click
 from rich.console import Console
@@ -14,17 +15,24 @@ from rich.console import Console
 _BACKEND_HOST = "127.0.0.1"
 _BACKEND_PORT = 8000
 _BACKEND_READY_TIMEOUT = 15.0
+_FRONTEND_PORT = 5173
+
+
+def _port_open(host: str, port: int) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except OSError:
+        return False
 
 
 def _wait_for_backend(host: str, port: int, timeout: float) -> bool:
     """Poll until something accepts connections on host:port, or time out."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=0.5):
-                return True
-        except OSError:
-            time.sleep(0.3)
+        if _port_open(host, port):
+            return True
+        time.sleep(0.3)
     return False
 
 
@@ -88,6 +96,13 @@ def clap(threshold: float, min_gap: float, max_gap: float, calibrate: bool) -> N
         return
 
     def _start_and_open_gui() -> None:
+        # Already open from an earlier clap — just bring it back up in the
+        # browser instead of spawning a second frontend on the same port
+        # (which would fail with "port unavailable").
+        if _port_open(_BACKEND_HOST, _FRONTEND_PORT):
+            webbrowser.open(f"http://{_BACKEND_HOST}:{_FRONTEND_PORT}")
+            return
+
         # Start the plain API server first (no-op if one is already running —
         # `start` just prints a warning and exits 1 in that case). Launching
         # the GUI with `--no-server` skips `jarvis gui`'s own server bootstrap,
