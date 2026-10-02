@@ -15,14 +15,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Priority order: local first, then cloud.
-TTS_BACKEND_ORDER = ("kokoro", "openai_tts", "cartesia")
+# Priority order: local first, then cloud. macos_say sits after kokoro (better
+# quality when available) but before the paid cloud backends, since it's free
+# and needs no API key — it just health-checks false on non-Mac platforms.
+TTS_BACKEND_ORDER = ("kokoro", "macos_say", "openai_tts", "cartesia")
 
 # Voice IDs are backend-specific and NOT portable. ``speech.voice_id`` applies
 # only to ``speech.tts_backend``; if synthesis falls back to another backend we
 # use that backend's own default rather than passing an unrecognized ID through.
 BACKEND_DEFAULT_VOICE = {
     "kokoro": "bm_george",  # British male
+    "macos_say": "Luciana",  # pt-BR, built into macOS
     "openai_tts": "onyx",  # deepest OpenAI preset
     "cartesia": "",  # no safe static default; let Cartesia choose
 }
