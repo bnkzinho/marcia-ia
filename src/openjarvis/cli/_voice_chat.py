@@ -110,13 +110,11 @@ class VoiceSession:
 
 
 def read_voice_input(console: Any, session: VoiceSession) -> Optional[str] | object:
-    """Accept a typed command/message, or record after an empty submission."""
-    try:
-        typed = input("You> [type, or press Enter to speak] ")
-    except (EOFError, KeyboardInterrupt):
-        return VOICE_EXIT
-    typed = typed.strip()
-    return typed if typed else record_voice(console, session)
+    """Record and transcribe immediately — no keypress needed to start.
+
+    Ctrl+C (raised inside ``record_voice``'s mic read) is the way out.
+    """
+    return record_voice(console, session)
 
 
 def record_voice(
